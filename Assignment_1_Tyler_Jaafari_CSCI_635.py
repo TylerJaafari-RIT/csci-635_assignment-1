@@ -6,24 +6,25 @@
 # 		sklearn.linear_model.LinearRegression or any solver that directly returns β for you.
 
 import numpy as np
-import torch
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from ucimlrepo import fetch_ucirepo
 from ucimlrepo import dotdict
 
 class BatchGradientDescent:
-	def __init__(self, X):
+	def __init__(self, X, eta=0.005, max_iter=50):
 		# HYPERPARAMETERS
 		self.beta = np.zeros((X.shape[1], 1))
-		self.eta = 0.05
-		self.max_iter = 5000
+		self.eta = eta
+		self.max_iter = max_iter
 
 	def gradient(self, beta, X, y):
 		grad = -2 * (X.T @ y) + 2 * (X.T @ (X @ beta))
 		return grad
 
 	def build_model(self, X, y):
+		result_output = open('BGDresults.rtf', mode='w')
 		for _ in range(self.max_iter):
 			grad = self.gradient(self.beta, X, y)
 			if np.any(np.isnan(grad)):
@@ -35,24 +36,25 @@ class BatchGradientDescent:
 		residuals = y - self.y_hat
 		self.RSS = (residuals.T @ residuals)
 
-		print(f"X: {X}")
-		print(f"y: {y}")
-		print(f"beta: {self.beta}")
-		print(f"ŷ: {self.y_hat}")
-		print(f"RSS: {self.RSS}")
+		print(f"X: {X}", file=result_output)
+		print(f"y: {y}", file=result_output)
+		print(f"beta: {self.beta}", file=result_output)
+		print(f"y_hat: {self.y_hat}", file=result_output)
+		print(f"RSS: {self.RSS}", file=result_output)
 
 class StochasticGradientDescent:
-	def __init__(self, X, eta=0.01, max_epochs=100):
+	def __init__(self, X, eta=0.005, max_epochs=50):
 		# HYPERPARAMETERS
 		self.beta = np.zeros((X.shape[1], 1))
 		self.eta = eta
 		self.max_epochs = max_epochs
 
 	def gradient(self, beta, X, y):
-		X = X.reshape(1, -1)
-		return -2 * (X.T * (y - (X @ beta)).item())
+		sample = X.reshape(1, -1)
+		return -2 * (sample.T * (y - (sample @ beta)).item())
 
 	def build_model(self, X, y):
+		result_output = open('SGDresults.rtf', mode='w')
 		n, p = X.shape
 		for epoch in range(self.max_epochs):
 			perm = np.random.permutation(n)
@@ -62,7 +64,7 @@ class StochasticGradientDescent:
 					y_i = y[idx, 0]
 				else:
 					y_i = y[idx]
-				grad = self.gradient(x_i, y_i, self.beta)
+				grad = self.gradient(self.beta, x_i, y_i)
 				if np.any(np.isnan(grad)):
 					print(f"NaN reached at epoch {epoch}, idx {idx}")
 					return
@@ -74,32 +76,33 @@ class StochasticGradientDescent:
 			y_hat = X @ self.beta
 			residuals = y - y_hat
 			self.RSS = (residuals.T @ residuals).item()
-			print(f"Epoch: {epoch}")
-			print(f"RSS: {self.RSS}")
+			print(f"Epoch: {epoch}", file=result_output)
+			print(f"RSS: {self.RSS}", file=result_output)
 
 		self.y_hat = X @ self.beta
 		residuals = y - self.y_hat
 		self.RSS = (residuals.T @ residuals)
 
-		print(f"beta: {self.beta}")
-		print(f"ŷ: {self.y_hat}")
-		print(f"RSS: {self.RSS}")
+		print(f"beta: {self.beta}", file=result_output)
+		print(f"y_hat: {self.y_hat}", file=result_output)
+		print(f"RSS: {self.RSS}", file=result_output)
 
 
 class MiniBatchGradientDescent:
 	def __init__(self, X):
 		# HYPERPARAMETERS
 		self.beta = np.zeros((X.shape[1], 1))
-		self.eta = 0.05
+		self.eta = 0.005
 		self.batch_size = 0.2 # defined as a portion of the dataset size
 		self.max_epochs = 5
-		self.max_iter = 500
+		self.max_iter = 50
 
 	def gradient(self, beta, X, y):
 		grad = -2 * (X.T @ y) + 2 * (X.T @ (X @ beta))
 		return grad
 
 	def build_model(self, X, y):
+		result_output = open('MBGDresults.rtf', mode='w')
 		for epoch in range(self.max_epochs):
 			# TODO: work in mean gradient over iterations
 			batch_size = int(self.batch_size * X.shape[0])
@@ -122,11 +125,12 @@ class MiniBatchGradientDescent:
 
 		# print(f"X: {X}")
 		# print(f"y: {y}")
-		print(f"beta: {self.beta}")
-		print(f"ŷ: {self.y_hat}")
-		print(f"RSS: {self.RSS}")
+		print(f"beta: {self.beta}", file=result_output)
+		print(f"y_hat: {self.y_hat}", file=result_output)
+		print(f"RSS: {self.RSS}", file=result_output)
 
 def main():
+	np.set_printoptions(threshold=100000)
 	# fetch dataset
 	auto_mpg = fetch_ucirepo(id=9)
 
@@ -142,12 +146,6 @@ def main():
 	combined = pd.concat((X, y), axis=1)
 	combined = combined.dropna()
 
-	# data_output = open('auto_mpg.txt', mode='w')
-	# print(X.to_string(), file=data_output)
-	# print('\n\n', file=data_output)
-	# print(y.to_string(), file=data_output)
-	# data_output.close()
-
 	combined_output = open('combined.txt', mode='w')
 	print(combined.to_string(), file=combined_output)
 	combined_output.close()
@@ -155,21 +153,30 @@ def main():
 	X = combined.drop(columns='mpg')
 	y = combined.drop(columns=X.columns)
 
+	X = StandardScaler().fit_transform(X, y)
+	y = StandardScaler().fit_transform(y)
+
+	data_output = open('split.txt', mode='w')
+	print(X, file=data_output)
+	print('\n\n', file=data_output)
+	print(y, file=data_output)
+	data_output.close()
+
 	# metadata
 	print(auto_mpg.metadata)
 
 	# variable information
 	print(auto_mpg.variables)
-			
+
 	print(f"X: {X}")
-	# bgd = BatchGradientDescent(np.asarray(X))
-	# bgd.build_model(np.asarray(X), y)
+	bgd = BatchGradientDescent(X)
+	bgd.build_model(X, y)
 
-	# sgd = StochasticGradientDescent(np.asarray(X))
-	# sgd.build_model(np.asarray(X), np.asarray(y))
+	sgd = StochasticGradientDescent(X)
+	sgd.build_model(X, y)
 
-	mbgd = MiniBatchGradientDescent(np.asarray(X))
-	mbgd.build_model(np.asarray(X), np.asarray(y))
+	mbgd = MiniBatchGradientDescent(X)
+	mbgd.build_model(X, y)
 
 if __name__ == "__main__":
 	main()
