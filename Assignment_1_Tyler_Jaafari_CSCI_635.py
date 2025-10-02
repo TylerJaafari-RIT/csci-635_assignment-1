@@ -10,10 +10,9 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from ucimlrepo import fetch_ucirepo
-from ucimlrepo import dotdict
 
 class BatchGradientDescent:
-	def __init__(self, X, eta=0.005, max_iter=50):
+	def __init__(self, X, eta=0.005, max_iter=100):
 		# HYPERPARAMETERS
 		self.beta = np.zeros((X.shape[1], 1))
 		self.eta = eta
@@ -27,8 +26,8 @@ class BatchGradientDescent:
 		result_output = open('BGDresults.rtf', mode='w')
 		for _ in range(self.max_iter):
 			grad = self.gradient(self.beta, X, y)
-			if np.any(np.isnan(grad)):
-				print("NaN reached; stopping descent.")
+			if np.any(np.isnan(grad)) or np.any(np.isinf(grad)):
+				print("Convergence reached; stopping descent.")
 				break
 			self.beta -= self.eta * grad
 
